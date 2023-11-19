@@ -19,9 +19,9 @@ type OrderInfo struct {
 }
 
 type OrderAccrual struct {
-	ID      string `json:"order"`
-	Status  string `json:"status"`
-	Accrual int    `json:"accrual,omitempty"`
+	ID      string  `json:"order"`
+	Status  string  `json:"status"`
+	Accrual float32 `json:"accrual,omitempty"`
 }
 
 const (
@@ -62,6 +62,8 @@ func CheckStatus(orderID int, accrualAddr string) (OrderAccrual, error) {
 			Status: OrderStatusNotRegister,
 		}, nil
 	}
+
+	fmt.Println("CheckStatus resp", resp)
 
 	return resp, nil
 }

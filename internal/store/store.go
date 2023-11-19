@@ -28,6 +28,11 @@ type Order struct {
 	UploadedAt string  `json:"uploaded_at"`
 }
 
+type UserBalance struct {
+	Current   float32 `json:"current"`
+	Withdrawn float32 `json:"withdrawn"`
+}
+
 type DatabaseConnection interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -62,7 +67,7 @@ func (s *Store) bootstrap(ctx context.Context) error {
 		CREATE TABLE IF NOT EXISTS orders(
 			id BIGINT PRIMARY KEY,
 			status VARCHAR(128),
-			accrual NUMERIC(5,2),
+			accrual NUMERIC(10,2),
 			date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_DATE,
 			fk_user_id INTEGER REFERENCES users(id) NOT NULL
 		)
@@ -71,7 +76,8 @@ func (s *Store) bootstrap(ctx context.Context) error {
 	tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS balance(
 			id SERIAL PRIMARY KEY,
-			amount NUMERIC(5,2),
+			current NUMERIC(10,2),
+			withdrawn NUMERIC(10,2),
 			fk_user_id INTEGER REFERENCES users(id) NOT NULL
 		)
 	`)
@@ -198,6 +204,61 @@ func (s *Store) GetOrders(ctx context.Context, userID int) ([]Order, error) {
 	}
 
 	return result, nil
+}
+
+func (s *Store) GetUserBalance(ctx context.Context, userID int) (UserBalance, error) {
+	var (
+		current   sql.NullFloat64
+		withdrawn sql.NullFloat64
+	)
+	row := s.DB.QueryRowContext(ctx, `SELECT current, withdrawn FROM balance WHERE fk_user_id = $1`, userID)
+	err := row.Scan(&current, &withdrawn)
+
+	if err != nil {
+		return UserBalance{}, err
+	}
+
+	return UserBalance{
+		Current:   float32(current.Float64),
+		Withdrawn: float32(withdrawn.Float64),
+	}, nil
+}
+
+func (s *Store) UpdateUserBalance(ctx context.Context, orderID string, accrual float32) error {
+	var (
+		userID  int
+		current float32
+	)
+	row := s.DB.QueryRowContext(ctx, `SELECT fk_user_id FROM orders WHERE id = $1`, orderID)
+	err := row.Scan(&userID)
+
+	if err != nil {
+		return err
+	}
+
+	row = s.DB.QueryRowContext(ctx, `SELECT current FROM balance WHERE fk_user_id = $1`, userID)
+	err = row.Scan(&current)
+
+	if err != nil {
+		var pgErr *pq.Error
+		if errors.As(err, &pgErr) && pgErr.Code != pgerrcode.NoData {
+			return err
+		}
+	}
+
+	if current > 0 {
+		_, err = s.DB.ExecContext(ctx, `
+				UPDATE balance SET current = $1
+					WHERE fk_user_id = $2
+			`, current+accrual, userID)
+	} else {
+		_, err = s.DB.ExecContext(ctx, `
+			INSERT INTO balance (current, withdrawn, fk_user_id)
+			VALUES($1, $2, $3);
+		`, accrual, nil, userID)
+	}
+
+	return err
 }
 
 func NewStore(db DatabaseConnection) *Store {

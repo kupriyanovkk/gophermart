@@ -50,7 +50,7 @@ func (a *App) Start() {
 			})
 
 			router.Get("/balance", func(w http.ResponseWriter, r *http.Request) {
-
+				handlers.GetUserBalance(w, r, a.Store)
 			})
 
 			router.Get("/withdrawals", func(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +77,8 @@ func (a *App) checkOrderStatus() {
 	for orderID := range a.OrdersChan {
 		status, err := order.CheckStatus(orderID, a.Flags.AccrualSystemAddress)
 
+		sugar.Infoln("status", status)
+
 		if err != nil {
 			sugar.Errorln(
 				"err", err.Error(),
@@ -99,6 +101,19 @@ func (a *App) checkOrderStatus() {
 				time.AfterFunc(5*time.Second, func() {
 					a.OrdersChan <- orderID
 				})
+				return
+			}
+
+			if status.Accrual > 0 {
+				err := a.Store.UpdateUserBalance(context.TODO(), status.ID, status.Accrual)
+
+				if err != nil {
+					sugar.Errorln(
+						"err", err.Error(),
+						"status", status,
+					)
+					return
+				}
 			}
 		}
 	}
