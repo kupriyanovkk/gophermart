@@ -21,6 +21,13 @@ var (
 	ErrorOrderAlreadyAdded  = errors.New("order has already been uploaded by this user")
 )
 
+type Order struct {
+	Number     string  `json:"number"`
+	Status     string  `json:"status"`
+	Accrual    float32 `json:"accrual,omitempty"`
+	UploadedAt string  `json:"uploaded_at"`
+}
+
 type DatabaseConnection interface {
 	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -55,7 +62,8 @@ func (s *Store) bootstrap(ctx context.Context) error {
 		CREATE TABLE IF NOT EXISTS orders(
 			id BIGINT PRIMARY KEY,
 			status VARCHAR(128),
-			date DATE DEFAULT CURRENT_DATE,
+			accrual NUMERIC(5,2),
+			date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_DATE,
 			fk_user_id INTEGER REFERENCES users(id) NOT NULL
 		)
 	`)
@@ -63,7 +71,7 @@ func (s *Store) bootstrap(ctx context.Context) error {
 	tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS balance(
 			id SERIAL PRIMARY KEY,
-			amount NUMERIC(5,2) NOT NULL,
+			amount NUMERIC(5,2),
 			fk_user_id INTEGER REFERENCES users(id) NOT NULL
 		)
 	`)
@@ -141,12 +149,55 @@ func (s *Store) AddOrder(ctx context.Context, orderID, userID int) error {
 	date := time.Now().Format(time.RFC3339)
 	_, err = s.DB.ExecContext(ctx, `
 		INSERT INTO orders
-		(id, status, date, fk_user_id)
+		(id, status, accrual, date, fk_user_id)
 		VALUES
-		($1, $2, $3, $4);
-	`, orderID, order.OrderStatusNew, date, userID)
+		($1, $2, $3, $4, $5);
+	`, orderID, order.OrderStatusNew, nil, date, userID)
 
 	return err
+}
+
+func (s *Store) UpdateOrder(ctx context.Context, orderStatus order.OrderAccrual) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE orders SET status = $1, accrual = $2
+			WHERE id = $3
+	`, orderStatus.Status, orderStatus.Accrual, orderStatus.ID)
+
+	return err
+}
+
+func (s *Store) GetOrders(ctx context.Context, userID int) ([]Order, error) {
+	limit := 100
+	result := make([]Order, 0, limit)
+
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, status, accrual, date FROM orders WHERE fk_user_id = $1`, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var o Order
+		err = rows.Scan(&o.Number, &o.Status, &o.Accrual, &o.UploadedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, Order{
+			Number:     o.Number,
+			Status:     o.Status,
+			Accrual:    o.Accrual,
+			UploadedAt: o.UploadedAt,
+		})
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }
 
 func NewStore(db DatabaseConnection) *Store {

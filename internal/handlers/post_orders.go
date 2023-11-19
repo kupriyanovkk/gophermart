@@ -11,7 +11,7 @@ import (
 	"github.com/kupriyanovkk/gophermart/internal/tokenutil"
 )
 
-func PostOrders(w http.ResponseWriter, r *http.Request, s store.Store) {
+func PostOrders(w http.ResponseWriter, r *http.Request, s store.Store, ordersChan chan int) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
@@ -31,6 +31,10 @@ func PostOrders(w http.ResponseWriter, r *http.Request, s store.Store) {
 	if errors.Is(err, store.ErrorOrderConflict) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
+	}
+
+	if err == nil || errors.Is(err, store.ErrorOrderAlreadyAdded) {
+		ordersChan <- orderID
 	}
 
 	if err != nil {

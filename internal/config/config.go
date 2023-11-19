@@ -14,11 +14,11 @@ type ConfigFlags struct {
 func ParseFlags() ConfigFlags {
 	var runAddress string
 	var databaseURI string
-	var accrual string
+	var accrualAddress string
 
-	flag.StringVar(&runAddress, "a", "localhost:8080", "address and port to run service")
+	flag.StringVar(&runAddress, "a", "localhost:8081", "address and port to run service")
 	flag.StringVar(&databaseURI, "d", "postgres://postgres:postgres@localhost:5432/gophermart?sslmode=disable", "the address for DB connection")
-	flag.StringVar(&accrual, "r", "", "address of the accrual calculation system")
+	flag.StringVar(&accrualAddress, "r", "http://localhost:8080", "address of the accrual calculation system")
 
 	if envRunAddr := os.Getenv("RUN_ADDRESS"); envRunAddr != "" {
 		runAddress = envRunAddr
@@ -27,12 +27,12 @@ func ParseFlags() ConfigFlags {
 		databaseURI = envDatabaseURI
 	}
 	if envAccrual := os.Getenv("ACCRUAL_SYSTEM_ADDRESS"); envAccrual != "" {
-		accrual = envAccrual
+		accrualAddress = envAccrual
 	}
 
 	return ConfigFlags{
 		RunAddress:           runAddress,
 		DatabaseURI:          databaseURI,
-		AccrualSystemAddress: accrual,
+		AccrualSystemAddress: accrualAddress,
 	}
 }
