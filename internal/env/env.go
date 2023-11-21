@@ -1,20 +1,26 @@
 package env
 
-import (
-	"github.com/spf13/viper"
-)
+import "os"
 
 type Env struct {
-	AccessTokenExpiryHour  string
-	AccessTokenSecret      string
+	AccessTokenExpiryHour string
+	AccessTokenSecret     string
 }
 
 func Get() Env {
-	viper.SetConfigFile("../../.env")
-	viper.ReadInConfig()
-
-	return Env{
-		AccessTokenSecret:     viper.Get("ACCESS_TOKEN_SECRET").(string),
-		AccessTokenExpiryHour: viper.Get("ACCESS_TOKEN_EXPIRY_HOUR").(string),
+	accessTokenSecret, tokenExists := os.LookupEnv("ACCESS_TOKEN_SECRET")
+	accessTokenExpiryHour, tokenExpExists := os.LookupEnv("ACCESS_TOKEN_EXPIRY_HOUR")
+	env := Env{
+		AccessTokenSecret:     "",
+		AccessTokenExpiryHour: "",
 	}
+
+	if tokenExists {
+		env.AccessTokenSecret = accessTokenSecret
+	}
+	if tokenExpExists {
+		env.AccessTokenExpiryHour = accessTokenExpiryHour
+	}
+
+	return env
 }

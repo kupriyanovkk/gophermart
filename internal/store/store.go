@@ -246,18 +246,29 @@ func (s *Store) UpdateUserBalance(ctx context.Context, orderID string, accrual f
 		}
 	}
 
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
 	if current > 0 {
-		_, err = s.DB.ExecContext(ctx, `
+		_, err = tx.ExecContext(ctx, `
 				UPDATE balance SET current = $1
 					WHERE fk_user_id = $2
 			`, current+accrual, userID)
 	} else {
-		_, err = s.DB.ExecContext(ctx, `
+		_, err = tx.ExecContext(ctx, `
 			INSERT INTO balance (current, withdrawn, fk_user_id)
 			VALUES($1, $2, $3);
 		`, accrual, nil, userID)
 	}
 
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	err = tx.Commit()
 	return err
 }
 
