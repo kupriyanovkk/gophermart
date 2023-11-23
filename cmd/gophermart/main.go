@@ -1,13 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
 	"github.com/joho/godotenv"
 	"github.com/kupriyanovkk/gophermart/internal/app"
 	"github.com/kupriyanovkk/gophermart/internal/config"
-	"github.com/kupriyanovkk/gophermart/internal/store"
+	"github.com/kupriyanovkk/gophermart/internal/shared"
 )
 
 func init() {
@@ -17,15 +18,13 @@ func init() {
 }
 
 func main() {
-	flags := config.ParseFlags()
+	flags := config.Get()
 	db, err := sql.Open("postgres", flags.DatabaseURI)
 
 	if err != nil {
 		panic(err)
 	}
 
-	store := store.NewStore(db)
-	app := app.NewApp(*store, flags)
-
+	shared.BootstrapDB(context.Background(), db)
 	app.Start()
 }

@@ -1,26 +1,18 @@
 package app
 
 import (
-	"context"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/kupriyanovkk/gophermart/internal/config"
-	"github.com/kupriyanovkk/gophermart/internal/handlers"
+	balanceHandlers "github.com/kupriyanovkk/gophermart/internal/domains/balance/handlers"
+	orderHandlers "github.com/kupriyanovkk/gophermart/internal/domains/order/handlers"
+	userHandlers "github.com/kupriyanovkk/gophermart/internal/domains/user/handlers"
 	"github.com/kupriyanovkk/gophermart/internal/middlewares"
-	"github.com/kupriyanovkk/gophermart/internal/order"
-	"github.com/kupriyanovkk/gophermart/internal/store"
-	"go.uber.org/zap"
 )
 
-type App struct {
-	Flags      config.ConfigFlags
-	Store      store.Store
-	OrdersChan chan int
-}
-
-func (a *App) Start() {
+func Start() {
+	flags := config.Get()
 	router := chi.NewRouter()
 
 	router.Use(
@@ -29,28 +21,26 @@ func (a *App) Start() {
 		middlewares.JwtAuth,
 	)
 
-	go a.checkOrderStatus()
-
 	router.Route("/api", func(router chi.Router) {
 		router.Route("/user", func(router chi.Router) {
 			router.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-				handlers.Register(w, r, a.Store)
+				userHandlers.Register(w, r)
 			})
 
 			router.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-				handlers.Login(w, r, a.Store)
+				userHandlers.Login(w, r)
 			})
 
 			router.Get("/orders", func(w http.ResponseWriter, r *http.Request) {
-				handlers.GetOrders(w, r, a.Store)
+				orderHandlers.GetOrders(w, r)
 			})
 
 			router.Post("/orders", func(w http.ResponseWriter, r *http.Request) {
-				handlers.PostOrders(w, r, a.Store, a.OrdersChan)
+				orderHandlers.PostOrders(w, r)
 			})
 
 			router.Get("/balance", func(w http.ResponseWriter, r *http.Request) {
-				handlers.GetUserBalance(w, r, a.Store)
+				balanceHandlers.GetUserBalance(w, r)
 			})
 
 			router.Get("/withdrawals", func(w http.ResponseWriter, r *http.Request) {
@@ -63,62 +53,8 @@ func (a *App) Start() {
 		})
 	})
 
-	err := http.ListenAndServe(a.Flags.RunAddress, router)
+	err := http.ListenAndServe(flags.RunAddress, router)
 	if err != nil {
 		panic(err)
 	}
-}
-
-func (a *App) checkOrderStatus() {
-	logger, _ := zap.NewDevelopment()
-	defer logger.Sync()
-	sugar := logger.Sugar()
-
-	for orderID := range a.OrdersChan {
-		status, err := order.CheckStatus(orderID, a.Flags.AccrualSystemAddress)
-
-		sugar.Infoln("status", status)
-
-		if err != nil {
-			sugar.Errorln(
-				"err", err.Error(),
-				"orderID", orderID,
-			)
-			return
-		}
-
-		if status.Status != order.OrderStatusNotRegister {
-			err = a.Store.UpdateOrder(context.TODO(), status)
-			if err != nil {
-				sugar.Errorln(
-					"err", err.Error(),
-					"status", status,
-				)
-				return
-			}
-
-			if status.Status != order.OrderStatusProcessed {
-				time.AfterFunc(5*time.Second, func() {
-					a.OrdersChan <- orderID
-				})
-				return
-			}
-
-			if status.Accrual > 0 {
-				err := a.Store.UpdateUserBalance(context.TODO(), status.ID, status.Accrual)
-
-				if err != nil {
-					sugar.Errorln(
-						"err", err.Error(),
-						"status", status,
-					)
-					return
-				}
-			}
-		}
-	}
-}
-
-func NewApp(s store.Store, f config.ConfigFlags) *App {
-	return &App{Store: s, Flags: f, OrdersChan: make(chan int, 10)}
 }

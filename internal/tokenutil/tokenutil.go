@@ -9,19 +9,23 @@ import (
 
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/kupriyanovkk/gophermart/internal/env"
-	"github.com/kupriyanovkk/gophermart/internal/models"
 )
 
-func BuildJWTString(userID int, environ env.Env) (string, error) {
-	duration, _ := strconv.ParseInt(environ.AccessTokenExpiryHour, 10, 64)
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, models.Claims{
+type Claims struct {
+	jwt.RegisteredClaims
+	UserID int
+}
+
+func BuildJWTString(userID int) (string, error) {
+	duration, _ := strconv.ParseInt(env.GetTokenExpiryHour(), 10, 64)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(duration))),
 		},
 		UserID: userID,
 	})
 
-	tokenString, err := token.SignedString([]byte(environ.AccessTokenSecret))
+	tokenString, err := token.SignedString([]byte(env.GetToken()))
 	if err != nil {
 		return "", err
 	}
@@ -29,14 +33,14 @@ func BuildJWTString(userID int, environ env.Env) (string, error) {
 	return tokenString, nil
 }
 
-func GetUserID(tokenString string, environ env.Env) int {
-	claims := &models.Claims{}
+func GetUserID(tokenString string) int {
+	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims,
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
-			return []byte(environ.AccessTokenSecret), nil
+			return []byte(env.GetToken()), nil
 		})
 	if err != nil {
 		return -1
@@ -50,15 +54,14 @@ func GetUserID(tokenString string, environ env.Env) int {
 	return claims.UserID
 }
 
-func SetTokenToHeader(w http.ResponseWriter, userID int, environ env.Env) {
-	token, _ := BuildJWTString(userID, environ)
+func SetTokenToHeader(w http.ResponseWriter, userID int) {
+	token, _ := BuildJWTString(userID)
 	bearer := "Bearer " + token
 
 	w.Header().Set("Authorization", bearer)
 }
 
 func GetUserIDFromHeader(r *http.Request) int {
-	environ := env.Get()
 	authHeader := r.Header.Get("Authorization")
 
 	if authHeader == "" {
@@ -72,5 +75,5 @@ func GetUserIDFromHeader(r *http.Request) int {
 
 	token := strings.TrimSpace(splitToken[1])
 
-	return GetUserID(token, environ)
+	return GetUserID(token)
 }

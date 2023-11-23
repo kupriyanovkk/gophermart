@@ -14,10 +14,8 @@ type Encrypt struct {
 	AEAD  cipher.AEAD
 }
 
-var environ = env.Get()
-
 func Get() (Encrypt, error) {
-	key := sha256.Sum256([]byte(environ.AccessTokenSecret))
+	key := sha256.Sum256([]byte(env.GetToken()))
 
 	aesblock, err := aes.NewCipher(key[:])
 	if err != nil {
