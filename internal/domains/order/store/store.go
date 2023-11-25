@@ -5,11 +5,9 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jackc/pgerrcode"
 	"github.com/kupriyanovkk/gophermart/internal/domains/order/models"
 	"github.com/kupriyanovkk/gophermart/internal/domains/order/status"
 	"github.com/kupriyanovkk/gophermart/internal/shared"
-	"github.com/lib/pq"
 )
 
 var (
@@ -51,7 +49,7 @@ func (s *Store) AddOrder(ctx context.Context, orderID, userID int) error {
 	return err
 }
 
-func (s *Store) UpdateOrder(ctx context.Context, orderStatus models.OrderAccrual) error {
+func (s *Store) UpdateOrder(ctx context.Context, orderStatus shared.LoyaltyOperation) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE orders SET status = $1, accrual = $2
 			WHERE id = $3
@@ -92,54 +90,6 @@ func (s *Store) GetOrders(ctx context.Context, userID int) ([]models.Order, erro
 	}
 
 	return result, nil
-}
-
-func (s *Store) UpdateUserBalance(ctx context.Context, orderID string, accrual float32) error {
-	var (
-		userID  int
-		current float32
-	)
-	row := s.db.QueryRowContext(ctx, `SELECT fk_user_id FROM orders WHERE id = $1`, orderID)
-	err := row.Scan(&userID)
-
-	if err != nil {
-		return err
-	}
-
-	row = s.db.QueryRowContext(ctx, `SELECT current FROM balance WHERE fk_user_id = $1`, userID)
-	err = row.Scan(&current)
-
-	if err != nil {
-		var pgErr *pq.Error
-		if errors.As(err, &pgErr) && pgErr.Code != pgerrcode.NoData {
-			return err
-		}
-	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	if current > 0 {
-		_, err = tx.ExecContext(ctx, `
-				UPDATE balance SET current = $1
-					WHERE fk_user_id = $2
-			`, current+accrual, userID)
-	} else {
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO balance (current, withdrawn, fk_user_id)
-			VALUES($1, $2, $3);
-		`, accrual, nil, userID)
-	}
-
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	err = tx.Commit()
-	return err
 }
 
 func NewStore(db shared.DatabaseConnection) *Store {

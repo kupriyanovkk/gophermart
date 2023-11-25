@@ -3,8 +3,6 @@ package shared
 import (
 	"context"
 	"database/sql"
-
-	"github.com/kupriyanovkk/gophermart/internal/cryptoutil"
 )
 
 type DatabaseConnection interface {
@@ -14,9 +12,10 @@ type DatabaseConnection interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
-type Store struct {
-	DB      DatabaseConnection
-	Encrypt cryptoutil.Encrypt
+type LoyaltyOperation struct {
+	ID      string  `json:"order"`
+	Status  string  `json:"status"`
+	Accrual float32 `json:"accrual,omitempty"`
 }
 
 func BootstrapDB(ctx context.Context, DB DatabaseConnection) error {
@@ -60,7 +59,8 @@ func BootstrapDB(ctx context.Context, DB DatabaseConnection) error {
 		CREATE TABLE IF NOT EXISTS withdrawals(
 			fk_order_id BIGINT REFERENCES orders(id) NOT NULL,
 			date DATE DEFAULT CURRENT_DATE,
-			fk_balance_id INTEGER REFERENCES balance(id) NOT NULL
+			sum NUMERIC(10,2),
+			fk_user_id INTEGER REFERENCES users(id) NOT NULL
 		)
 	`)
 

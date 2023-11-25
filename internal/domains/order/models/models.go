@@ -10,12 +10,6 @@ type OrderInfo struct {
 	Goods []Good
 }
 
-type OrderAccrual struct {
-	ID      string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual float32 `json:"accrual,omitempty"`
-}
-
 type Order struct {
 	Number     string  `json:"number"`
 	Status     string  `json:"status"`

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,27 +8,21 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/kupriyanovkk/gophermart/internal/config"
 	"github.com/kupriyanovkk/gophermart/internal/domains/order"
 	"github.com/kupriyanovkk/gophermart/internal/domains/order/store"
 	"github.com/kupriyanovkk/gophermart/internal/luhn"
+	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/kupriyanovkk/gophermart/internal/tokenutil"
 )
 
 var orderStore *store.Store
 
-func init() {
+func Init(db shared.DatabaseConnection, loyaltyChan chan shared.LoyaltyOperation) {
 	fmt.Println("order init")
-	flags := config.Get()
-	db, err := sql.Open("postgres", flags.DatabaseURI)
-
-	if err != nil {
-		panic(err)
-	}
 
 	orderStore = store.NewStore(db)
 
-	go order.Flush(orderStore)
+	go order.Flush(orderStore, loyaltyChan)
 }
 
 func GetOrders(w http.ResponseWriter, r *http.Request) {

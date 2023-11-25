@@ -1,29 +1,22 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
-	"github.com/kupriyanovkk/gophermart/internal/config"
 	"github.com/kupriyanovkk/gophermart/internal/domains/user/models"
 	"github.com/kupriyanovkk/gophermart/internal/domains/user/store"
+	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/kupriyanovkk/gophermart/internal/tokenutil"
 )
 
 var userStore *store.Store
 
-func init() {
+func Init(db shared.DatabaseConnection) {
 	fmt.Println("user init")
-	flags := config.Get()
-	db, err := sql.Open("postgres", flags.DatabaseURI)
-
-	if err != nil {
-		panic(err)
-	}
 
 	userStore = store.NewStore(db)
 }

@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/kupriyanovkk/gophermart/internal/config"
-	"github.com/kupriyanovkk/gophermart/internal/domains/order/models"
 	orderStatus "github.com/kupriyanovkk/gophermart/internal/domains/order/status"
 	"github.com/kupriyanovkk/gophermart/internal/domains/order/store"
+	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"go.uber.org/zap"
 )
 
-func Flush(store *store.Store) {
+func Flush(store *store.Store, loyaltyChan chan shared.LoyaltyOperation) {
 	logger, _ := zap.NewDevelopment()
 	defer logger.Sync()
 	sugar := logger.Sugar()
@@ -29,6 +29,7 @@ func Flush(store *store.Store) {
 
 		if err != nil {
 			sugar.Errorln(
+				"ORDER Flush",
 				"err", err.Error(),
 				"orderID", orderID,
 			)
@@ -53,46 +54,38 @@ func Flush(store *store.Store) {
 			}
 
 			if status.Accrual > 0 {
-				err := store.UpdateUserBalance(context.TODO(), status.ID, status.Accrual)
-
-				if err != nil {
-					sugar.Errorln(
-						"err", err.Error(),
-						"status", status,
-					)
-					return
-				}
+				loyaltyChan <- status
 			}
 		}
 	}
 }
 
-func CheckStatus(orderID int, accrualAddr string) (models.OrderAccrual, error) {
+func CheckStatus(orderID int, accrualAddr string) (shared.LoyaltyOperation, error) {
 	endpoint := fmt.Sprintf("%s/api/orders/%d", accrualAddr, orderID)
 	client := &http.Client{}
 	request, err := http.NewRequest(http.MethodGet, endpoint, bytes.NewBuffer(nil))
 	if err != nil {
-		return models.OrderAccrual{}, err
+		return shared.LoyaltyOperation{}, err
 	}
 
 	request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	response, err := client.Do(request)
 	if err != nil {
-		return models.OrderAccrual{}, err
+		return shared.LoyaltyOperation{}, err
 	}
 
 	defer response.Body.Close()
 
-	var resp models.OrderAccrual
+	var resp shared.LoyaltyOperation
 	if response.StatusCode == http.StatusOK {
 		body, _ := io.ReadAll(response.Body)
 		err := json.Unmarshal(body, &resp)
 		if err != nil {
-			return models.OrderAccrual{}, err
+			return shared.LoyaltyOperation{}, err
 		}
 	}
 	if response.StatusCode == http.StatusNoContent {
-		return models.OrderAccrual{
+		return shared.LoyaltyOperation{
 			ID:     "-1",
 			Status: orderStatus.OrderStatusNotRegister,
 		}, nil

@@ -20,8 +20,8 @@ func init() {
 }
 
 func parseFlags() ConfigFlags {
-	flag.StringVar(&runAddress, "a", "localhost:8081", "address and port to run service")
-	flag.StringVar(&databaseURI, "d", "postgres://postgres:postgres@localhost:5432/gophermart?sslmode=disable", "the address for DB connection")
+	flag.StringVar(&runAddress, "a", "http://localhost:8081", "address and port to run service")
+	flag.StringVar(&databaseURI, "d", "", "the address for DB connection")
 	flag.StringVar(&accrualAddress, "r", "http://localhost:8080", "address of the accrual calculation system")
 
 	if envRunAddr := os.Getenv("RUN_ADDRESS"); envRunAddr != "" {
