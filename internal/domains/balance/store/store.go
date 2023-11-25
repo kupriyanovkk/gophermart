@@ -30,7 +30,10 @@ func (s *Store) GetUserBalance(ctx context.Context, userID int) (models.UserBala
 	err := row.Scan(&current, &withdrawn)
 
 	if err != nil {
-		return models.UserBalance{}, err
+		return models.UserBalance{
+			Current:   0,
+			Withdrawn: 0,
+		}, err
 	}
 
 	return models.UserBalance{
@@ -51,7 +54,7 @@ func (s *Store) AddPoints(ctx context.Context, orderID string, accrual, withdraw
 	}
 
 	userBalance, err := s.GetUserBalance(ctx, userID)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return err
 	}
 
@@ -135,7 +138,7 @@ func (s *Store) AddWithdraw(ctx context.Context, userID int, orderID string, sum
 
 	date := time.Now().Format(time.RFC3339)
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO withdrawals (fk_order_id, date, sum, fk_user_id)
+		INSERT INTO withdrawals (order_id, date, sum, fk_user_id)
 		VALUES($1, $2, $3, $4);
 	`, orderID, date, sum, userID)
 
@@ -152,7 +155,7 @@ func (s *Store) SelectWithdraws(ctx context.Context, userID int) ([]models.Withd
 	limit := 100
 	result := make([]models.Withdraws, 0, limit)
 
-	rows, err := s.db.QueryContext(ctx, `SELECT fk_order_id, sum, date FROM withdrawals WHERE fk_user_id = $1 LIMIT $2`, userID, limit)
+	rows, err := s.db.QueryContext(ctx, `SELECT order_id, sum, date FROM withdrawals WHERE fk_user_id = $1 LIMIT $2`, userID, limit)
 	if err != nil {
 		return nil, err
 	}

@@ -39,8 +39,8 @@ func BootstrapDB(ctx context.Context, DB DatabaseConnection) error {
 	tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS orders(
 			id BIGINT PRIMARY KEY,
-			status VARCHAR(128),
-			accrual NUMERIC(10,2),
+			status VARCHAR(128) NOT NULL,
+			accrual NUMERIC(10,2) NOT NULL,
 			date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_DATE,
 			fk_user_id INTEGER REFERENCES users(id) NOT NULL
 		)
@@ -57,7 +57,7 @@ func BootstrapDB(ctx context.Context, DB DatabaseConnection) error {
 
 	tx.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS withdrawals(
-			fk_order_id BIGINT REFERENCES orders(id) NOT NULL,
+			order_id BIGINT NOT NULL,
 			date DATE DEFAULT CURRENT_DATE,
 			sum NUMERIC(10,2),
 			fk_user_id INTEGER REFERENCES users(id) NOT NULL

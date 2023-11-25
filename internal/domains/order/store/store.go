@@ -44,7 +44,7 @@ func (s *Store) AddOrder(ctx context.Context, orderID, userID int) error {
 		(id, status, accrual, date, fk_user_id)
 		VALUES
 		($1, $2, $3, $4, $5);
-	`, orderID, status.OrderStatusNew, nil, date, userID)
+	`, orderID, status.OrderStatusNew, 0, date, userID)
 
 	return err
 }

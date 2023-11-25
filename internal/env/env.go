@@ -9,7 +9,7 @@ func GetToken() string {
 		return accessTokenSecret
 	}
 
-	return ""
+	return "access_token_secret"
 }
 
 func GetTokenExpiryHour() string {
@@ -19,5 +19,5 @@ func GetTokenExpiryHour() string {
 		return accessTokenExpiryHour
 	}
 
-	return ""
+	return "3"
 }

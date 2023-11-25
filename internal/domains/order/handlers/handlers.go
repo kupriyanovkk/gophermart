@@ -56,8 +56,13 @@ func PostOrders(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	orderID, err := strconv.Atoi(string(body))
-	if err != nil || !luhn.Valid(orderID) {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if !luhn.Valid(orderID) {
+		http.Error(w, "invalid order number format", http.StatusUnprocessableEntity)
 		return
 	}
 

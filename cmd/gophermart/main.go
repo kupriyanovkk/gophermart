@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"log"
 
 	"github.com/joho/godotenv"
 	"github.com/kupriyanovkk/gophermart/internal/app"
@@ -13,7 +13,7 @@ import (
 
 func init() {
 	if err := godotenv.Load(); err != nil {
-		fmt.Print("No .env file found")
+		log.Println("No .env file found")
 	}
 }
 
