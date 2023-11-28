@@ -63,11 +63,11 @@ func (s *Store) AddPoints(ctx context.Context, orderID string, accrual, withdraw
 		return s.UpdateUserBalance(ctx, userID, orderID, userBalance)
 	} else {
 		userBalance.Current = accrual
-		return s.InsertUserBalance(ctx, userID, orderID, userBalance.Current)
+		return s.InsertUserBalance(ctx, userID, userBalance.Current)
 	}
 }
 
-func (s *Store) InsertUserBalance(ctx context.Context, userID int, orderID string, current float32) error {
+func (s *Store) InsertUserBalance(ctx context.Context, userID int, current float32) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

@@ -17,7 +17,7 @@ func Flush(store *store.Store) {
 
 		if err != nil {
 			sugar.Errorln(
-				"BALANCE Flush",
+				"Balance Flush",
 				"err", err.Error(),
 				"operation", operation,
 			)

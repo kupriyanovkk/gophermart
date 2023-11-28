@@ -1,6 +1,7 @@
 package middlewares
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -33,7 +34,7 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 func Logger(h http.Handler) http.Handler {
 	logger, err := zap.NewDevelopment()
 	if err != nil {
-		panic("cannot initialize zap")
+		fmt.Println("cannot initialize zap")
 	}
 	defer logger.Sync()
 

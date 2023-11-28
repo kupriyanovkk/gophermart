@@ -29,7 +29,7 @@ func Flush(store *store.Store, loyaltyChan chan shared.LoyaltyOperation) {
 
 		if err != nil {
 			sugar.Errorln(
-				"ORDER Flush",
+				"Order Flush",
 				"err", err.Error(),
 				"orderID", orderID,
 			)
@@ -40,6 +40,7 @@ func Flush(store *store.Store, loyaltyChan chan shared.LoyaltyOperation) {
 			err = store.UpdateOrder(context.TODO(), status)
 			if err != nil {
 				sugar.Errorln(
+					"store.UpdateOrder",
 					"err", err.Error(),
 					"status", status,
 				)
