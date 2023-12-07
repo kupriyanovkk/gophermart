@@ -12,7 +12,7 @@ import (
 )
 
 type MemoryStore struct {
-	orders []models.Order
+	orders map[int]models.Order
 	Chan   chan models.Order
 }
 
@@ -33,13 +33,13 @@ func (s *MemoryStore) AddOrder(ctx context.Context, orderID, userID int) error {
 	}
 
 	date := time.Now().Format(time.RFC3339)
-	s.orders = append(s.orders, models.Order{
+	s.orders[userID] = models.Order{
 		UserID:     userID,
 		Number:     strconv.Itoa(orderID),
 		Status:     accrual.StatusNew,
 		Accrual:    0,
 		UploadedAt: date,
-	})
+	}
 
 	return nil
 }
@@ -50,7 +50,8 @@ func (s *MemoryStore) UpdateOrder(ctx context.Context, operation accrual.Accrual
 
 	for _, o := range s.orders {
 		if o.Number == operation.Order {
-			o = models.Order{
+			order, _ := strconv.Atoi(operation.Order)
+			s.orders[order] = models.Order{
 				Number:  operation.Order,
 				Status:  operation.Status,
 				Accrual: operation.Accrual,
@@ -87,7 +88,7 @@ func (s *MemoryStore) WriteChan(order models.Order) {
 
 func NewStore() models.OrderStore {
 	return &MemoryStore{
-		orders: make([]models.Order, 100),
+		orders: make(map[int]models.Order),
 		Chan:   make(chan models.Order, 100),
 	}
 }
