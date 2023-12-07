@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/kupriyanovkk/gophermart/internal/accrual"
 	"github.com/kupriyanovkk/gophermart/internal/domains/balance/models"
-	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ func TestGetUserBalance(t *testing.T) {
 	}
 	defer db.Close()
 
-	loyaltyChan := make(chan shared.LoyaltyOperation)
+	loyaltyChan := make(chan accrual.Accrual)
 	testStore := NewStore(db, loyaltyChan)
 
 	userID := 1
@@ -49,7 +49,7 @@ func TestGetUserBalance_Error(t *testing.T) {
 	}
 	defer db.Close()
 
-	loyaltyChan := make(chan shared.LoyaltyOperation)
+	loyaltyChan := make(chan accrual.Accrual)
 	testStore := NewStore(db, loyaltyChan)
 
 	userID := 1
@@ -73,7 +73,7 @@ func TestUpdateUserBalance(t *testing.T) {
 	}
 	defer db.Close()
 
-	loyaltyChan := make(chan shared.LoyaltyOperation)
+	loyaltyChan := make(chan accrual.Accrual)
 	testStore := NewStore(db, loyaltyChan)
 
 	userID := 1
@@ -105,7 +105,7 @@ func TestInsertUserBalance(t *testing.T) {
 	}
 	defer db.Close()
 
-	loyaltyChan := make(chan shared.LoyaltyOperation)
+	loyaltyChan := make(chan accrual.Accrual)
 	testStore := NewStore(db, loyaltyChan)
 
 	userID := 1
@@ -134,7 +134,7 @@ func TestSelectWithdraws(t *testing.T) {
 		}
 		defer db.Close()
 
-		loyaltyChan := make(chan shared.LoyaltyOperation)
+		loyaltyChan := make(chan accrual.Accrual)
 		testStore := NewStore(db, loyaltyChan)
 
 		date := time.Now().Format(time.RFC3339)
@@ -153,7 +153,7 @@ func TestSelectWithdraws(t *testing.T) {
 			t.Errorf("Unexpected error: %v", err)
 		}
 
-		expectedResult := []models.Withdraws{
+		expectedResult := []models.Withdraw{
 			{
 				Order:       order,
 				Sum:         sum,

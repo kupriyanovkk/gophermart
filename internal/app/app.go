@@ -5,33 +5,37 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/kupriyanovkk/gophermart/internal/accrual"
 	"github.com/kupriyanovkk/gophermart/internal/config"
-	balance "github.com/kupriyanovkk/gophermart/internal/domains/balance/handlers"
-	order "github.com/kupriyanovkk/gophermart/internal/domains/order/handlers"
-	user "github.com/kupriyanovkk/gophermart/internal/domains/user/handlers"
+	"github.com/kupriyanovkk/gophermart/internal/domains/balance"
+	balanceHandlers "github.com/kupriyanovkk/gophermart/internal/domains/balance/handlers"
+	"github.com/kupriyanovkk/gophermart/internal/domains/order"
+	orderHandlers "github.com/kupriyanovkk/gophermart/internal/domains/order/handlers"
+	"github.com/kupriyanovkk/gophermart/internal/domains/user"
+	userHandlers "github.com/kupriyanovkk/gophermart/internal/domains/user/handlers"
+
 	"github.com/kupriyanovkk/gophermart/internal/middlewares"
-	"github.com/kupriyanovkk/gophermart/internal/shared"
 )
 
-func init() {
-	flags := config.Get()
+func Prepare(flags config.ConfigFlags) {
 	db, err := sql.Open("postgres", flags.DatabaseURI)
 
 	if err != nil {
 		panic(err)
 	}
 
-	loyaltyChan := make(chan shared.LoyaltyOperation)
+	accrualChan := make(chan accrual.Accrual)
+	accrualClient := accrual.NewClient(flags.AccrualSystemAddress)
+	balance := balance.NewBalance(db, accrualChan)
+	order := order.NewOrder(db, accrualChan, accrualClient)
+	user := user.NewUser(db)
 
-	balance.Init(db, loyaltyChan)
-
-	order.Init(db, loyaltyChan)
-
-	user.Init(db)
+	balanceHandlers.Init(balance.Store)
+	orderHandlers.Init(order.Store)
+	userHandlers.Init(user.Store)
 }
 
-func Start() {
-	flags := config.Get()
+func Start(flags config.ConfigFlags) {
 	router := chi.NewRouter()
 
 	router.Use(
@@ -43,31 +47,31 @@ func Start() {
 	router.Route("/api", func(router chi.Router) {
 		router.Route("/user", func(router chi.Router) {
 			router.Post("/register", func(w http.ResponseWriter, r *http.Request) {
-				user.Register(w, r)
+				userHandlers.Register(w, r)
 			})
 
 			router.Post("/login", func(w http.ResponseWriter, r *http.Request) {
-				user.Login(w, r)
+				userHandlers.Login(w, r)
 			})
 
 			router.Get("/orders", func(w http.ResponseWriter, r *http.Request) {
-				order.GetOrders(w, r)
+				orderHandlers.GetOrders(w, r)
 			})
 
 			router.Post("/orders", func(w http.ResponseWriter, r *http.Request) {
-				order.PostOrders(w, r)
+				orderHandlers.PostOrders(w, r)
 			})
 
 			router.Get("/balance", func(w http.ResponseWriter, r *http.Request) {
-				balance.GetUserBalance(w, r)
+				balanceHandlers.GetUserBalance(w, r)
 			})
 
 			router.Get("/withdrawals", func(w http.ResponseWriter, r *http.Request) {
-				balance.GetWithdraw(w, r)
+				balanceHandlers.GetWithdraw(w, r)
 			})
 
 			router.Post("/balance/withdraw", func(w http.ResponseWriter, r *http.Request) {
-				balance.PostWithdraw(w, r)
+				balanceHandlers.PostWithdraw(w, r)
 			})
 		})
 	})

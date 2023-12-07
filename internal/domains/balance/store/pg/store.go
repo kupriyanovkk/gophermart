@@ -3,23 +3,18 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 	"time"
 
+	"github.com/kupriyanovkk/gophermart/internal/accrual"
+	"github.com/kupriyanovkk/gophermart/internal/domains/balance/failure"
 	"github.com/kupriyanovkk/gophermart/internal/domains/balance/models"
 	"github.com/kupriyanovkk/gophermart/internal/shared"
 )
 
 type Store struct {
 	db          shared.DatabaseConnection
-	LoyaltyChan chan shared.LoyaltyOperation
+	AccrualChan chan accrual.Accrual
 }
-
-var (
-	ErrorNoMoney      = errors.New("there are not enough funds in the account")
-	ErrorInvalidOrder = errors.New("invalid order number")
-)
 
 func (s *Store) GetUserBalance(ctx context.Context, userID int) (models.UserBalance, error) {
 	var (
@@ -42,11 +37,11 @@ func (s *Store) GetUserBalance(ctx context.Context, userID int) (models.UserBala
 	}, nil
 }
 
-func (s *Store) AddPoints(ctx context.Context, orderID string, accrual, withdrawn float32) error {
+func (s *Store) AddPoints(ctx context.Context, accrual accrual.Accrual) error {
 	var (
 		userID int
 	)
-	row := s.db.QueryRowContext(ctx, `SELECT fk_user_id FROM orders WHERE id = $1`, orderID)
+	row := s.db.QueryRowContext(ctx, `SELECT fk_user_id FROM orders WHERE id = $1`, accrual.Order)
 	err := row.Scan(&userID)
 
 	if err != nil {
@@ -59,10 +54,10 @@ func (s *Store) AddPoints(ctx context.Context, orderID string, accrual, withdraw
 	}
 
 	if userBalance.Current > 0 {
-		userBalance.Current += accrual
-		return s.UpdateUserBalance(ctx, userID, orderID, userBalance)
+		userBalance.Current += accrual.Accrual
+		return s.UpdateUserBalance(ctx, userID, accrual.Order, userBalance)
 	} else {
-		userBalance.Current = accrual
+		userBalance.Current = accrual.Accrual
 		return s.InsertUserBalance(ctx, userID, userBalance.Current)
 	}
 }
@@ -72,13 +67,15 @@ func (s *Store) InsertUserBalance(ctx context.Context, userID int, current float
 	if err != nil {
 		return err
 	}
+
+	defer tx.Rollback()
+
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO balance (current, withdrawn, fk_user_id)
 		VALUES($1, $2, $3);
 	`, current, nil, userID)
 
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 
@@ -92,13 +89,13 @@ func (s *Store) UpdateUserBalance(ctx context.Context, userID int, orderID strin
 		return err
 	}
 
+	defer tx.Rollback()
 	_, err = tx.ExecContext(ctx, `
 		UPDATE balance SET current = $1, withdrawn = $2
 		WHERE fk_user_id = $3
 	`, userBalance.Current, userBalance.Withdrawn, userID)
 
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 
@@ -116,16 +113,14 @@ func (s *Store) AddWithdraw(ctx context.Context, userID int, orderID string, sum
 	userBalance.Withdrawn += sum
 
 	if userBalance.Current < 0 {
-		return ErrorNoMoney
+		return failure.ErrorNoMoney
 	}
 
 	err = s.UpdateUserBalance(ctx, userID, orderID, userBalance)
 
 	if err == sql.ErrNoRows {
-		err = ErrorInvalidOrder
+		err = failure.ErrorInvalidOrder
 	}
-
-	fmt.Println(err)
 
 	if err != nil {
 		return err
@@ -136,6 +131,8 @@ func (s *Store) AddWithdraw(ctx context.Context, userID int, orderID string, sum
 		return err
 	}
 
+	defer tx.Rollback()
+
 	date := time.Now().Format(time.RFC3339)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO withdrawals (order_id, date, sum, fk_user_id)
@@ -143,7 +140,6 @@ func (s *Store) AddWithdraw(ctx context.Context, userID int, orderID string, sum
 	`, orderID, date, sum, userID)
 
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 
@@ -151,9 +147,9 @@ func (s *Store) AddWithdraw(ctx context.Context, userID int, orderID string, sum
 	return err
 }
 
-func (s *Store) SelectWithdraws(ctx context.Context, userID int) ([]models.Withdraws, error) {
+func (s *Store) SelectWithdraws(ctx context.Context, userID int) ([]models.Withdraw, error) {
 	limit := 100
-	result := make([]models.Withdraws, 0, limit)
+	result := make([]models.Withdraw, 0, limit)
 
 	rows, err := s.db.QueryContext(ctx, `SELECT order_id, sum, date FROM withdrawals WHERE fk_user_id = $1 LIMIT $2`, userID, limit)
 	if err != nil {
@@ -162,13 +158,13 @@ func (s *Store) SelectWithdraws(ctx context.Context, userID int) ([]models.Withd
 
 	defer rows.Close()
 	for rows.Next() {
-		var w models.Withdraws
+		var w models.Withdraw
 		err = rows.Scan(&w.Order, &w.Sum, &w.ProcessedAt)
 		if err != nil {
 			return nil, err
 		}
 
-		result = append(result, models.Withdraws{
+		result = append(result, models.Withdraw{
 			Order:       w.Order,
 			Sum:         w.Sum,
 			ProcessedAt: w.ProcessedAt,
@@ -183,6 +179,14 @@ func (s *Store) SelectWithdraws(ctx context.Context, userID int) ([]models.Withd
 	return result, nil
 }
 
-func NewStore(db shared.DatabaseConnection, loyaltyChan chan shared.LoyaltyOperation) *Store {
-	return &Store{db: db, LoyaltyChan: loyaltyChan}
+func (s *Store) ReadChan() accrual.Accrual {
+	return <-s.AccrualChan
+}
+
+func (s *Store) WriteChan(accrual accrual.Accrual) {
+	s.AccrualChan <- accrual
+}
+
+func NewStore(db shared.DatabaseConnection, accrualChan chan accrual.Accrual) models.BalanceStore {
+	return &Store{db: db, AccrualChan: accrualChan}
 }

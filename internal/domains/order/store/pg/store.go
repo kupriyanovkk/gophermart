@@ -2,22 +2,17 @@ package store
 
 import (
 	"context"
-	"errors"
 	"time"
 
+	"github.com/kupriyanovkk/gophermart/internal/accrual"
+	"github.com/kupriyanovkk/gophermart/internal/domains/order/failure"
 	"github.com/kupriyanovkk/gophermart/internal/domains/order/models"
-	"github.com/kupriyanovkk/gophermart/internal/domains/order/status"
 	"github.com/kupriyanovkk/gophermart/internal/shared"
 )
 
-var (
-	ErrorOrderConflict     = errors.New("order has already been uploaded by another user")
-	ErrorOrderAlreadyAdded = errors.New("order has already been uploaded by this user")
-)
-
 type Store struct {
-	db         shared.DatabaseConnection
-	OrdersChan chan int
+	db   shared.DatabaseConnection
+	Chan chan models.Order
 }
 
 func (s *Store) AddOrder(ctx context.Context, orderID, userID int) error {
@@ -30,9 +25,9 @@ func (s *Store) AddOrder(ctx context.Context, orderID, userID int) error {
 	if err == nil && user != 0 {
 		// order already added
 		if user == userID {
-			err = ErrorOrderAlreadyAdded
+			err = failure.ErrorOrderAlreadyAdded
 		} else {
-			err = ErrorOrderConflict
+			err = failure.ErrorOrderConflict
 		}
 
 		return err
@@ -44,16 +39,16 @@ func (s *Store) AddOrder(ctx context.Context, orderID, userID int) error {
 		(id, status, accrual, date, fk_user_id)
 		VALUES
 		($1, $2, $3, $4, $5);
-	`, orderID, status.OrderStatusNew, 0, date, userID)
+	`, orderID, accrual.StatusNew, 0, date, userID)
 
 	return err
 }
 
-func (s *Store) UpdateOrder(ctx context.Context, orderStatus shared.LoyaltyOperation) error {
+func (s *Store) UpdateOrder(ctx context.Context, operation accrual.Accrual) error {
 	_, err := s.db.ExecContext(ctx, `
 		UPDATE orders SET status = $1, accrual = $2
 			WHERE id = $3
-	`, orderStatus.Status, orderStatus.Accrual, orderStatus.ID)
+	`, operation.Status, operation.Accrual, operation.Order)
 
 	return err
 }
@@ -92,6 +87,14 @@ func (s *Store) GetOrders(ctx context.Context, userID int) ([]models.Order, erro
 	return result, nil
 }
 
-func NewStore(db shared.DatabaseConnection) *Store {
-	return &Store{db: db, OrdersChan: make(chan int)}
+func (s *Store) ReadChan() models.Order {
+	return <-s.Chan
+}
+
+func (s *Store) WriteChan(order models.Order) {
+	s.Chan <- order
+}
+
+func NewStore(db shared.DatabaseConnection) models.OrderStore {
+	return &Store{db: db, Chan: make(chan models.Order, 100)}
 }

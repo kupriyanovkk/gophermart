@@ -7,14 +7,10 @@ import (
 
 	"github.com/jackc/pgerrcode"
 	"github.com/kupriyanovkk/gophermart/internal/cryptoutil"
+	"github.com/kupriyanovkk/gophermart/internal/domains/user/failure"
+	"github.com/kupriyanovkk/gophermart/internal/domains/user/models"
 	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/lib/pq"
-)
-
-var (
-	ErrorInvalidCredentials = errors.New("invalid login/password pair")
-	ErrorLoginConflict      = errors.New("login is already occupied")
-	ErrorInvalidRequests    = errors.New("invalid request format")
 )
 
 type Store struct {
@@ -36,7 +32,7 @@ func (s *Store) RegisterUser(ctx context.Context, login, password string) (int, 
 	if err != nil {
 		var pgErr *pq.Error
 		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.UniqueViolation {
-			err = ErrorLoginConflict
+			err = failure.ErrorLoginConflict
 		}
 	}
 
@@ -58,12 +54,32 @@ func (s *Store) LoginUser(ctx context.Context, login, password string) (int, err
 	}
 
 	if hex.EncodeToString(encryptedPass) != pass {
-		return -1, ErrorInvalidCredentials
+		return -1, failure.ErrorInvalidCredentials
 	}
 
 	return userID, nil
 }
 
-func NewStore(db shared.DatabaseConnection) *Store {
+func (s *Store) GetUser(ctx context.Context, userID int) (models.Credentials, error) {
+	var (
+		id       int
+		login    string
+		password string
+	)
+	row := s.db.QueryRowContext(ctx, `SELECT id, login, password, id FROM users WHERE id = $1`, userID)
+	err := row.Scan(&id, &login, &password)
+
+	if err != nil {
+		return models.Credentials{}, err
+	}
+
+	return models.Credentials{
+		ID:       id,
+		Login:    login,
+		Password: password,
+	}, nil
+}
+
+func NewStore(db shared.DatabaseConnection) models.UserStore {
 	return &Store{db: db}
 }

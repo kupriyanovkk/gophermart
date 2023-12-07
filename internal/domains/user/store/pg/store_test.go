@@ -7,6 +7,7 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/kupriyanovkk/gophermart/internal/cryptoutil"
+	"github.com/kupriyanovkk/gophermart/internal/domains/user/failure"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -46,11 +47,11 @@ func TestRegisterUser_UniqueViolationError(t *testing.T) {
 	login := "existinguser"
 	password := "testpassword"
 
-	mock.ExpectQuery(`^INSERT INTO users`).WithArgs(login, sqlmock.AnyArg()).WillReturnError(ErrorLoginConflict)
+	mock.ExpectQuery(`^INSERT INTO users`).WithArgs(login, sqlmock.AnyArg()).WillReturnError(failure.ErrorLoginConflict)
 
 	userID, err := store.RegisterUser(context.Background(), login, password)
 
-	assert.EqualError(t, err, ErrorLoginConflict.Error(), "Expected unique violation error")
+	assert.EqualError(t, err, failure.ErrorLoginConflict.Error(), "Expected unique violation error")
 	assert.Zero(t, userID, "User ID should be zero on error")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -102,7 +103,7 @@ func TestLoginUser_InvalidCredentials(t *testing.T) {
 
 	userID, err := store.LoginUser(context.Background(), login, password)
 
-	assert.EqualError(t, err, ErrorInvalidCredentials.Error(), "Expected invalid credentials error")
+	assert.EqualError(t, err, failure.ErrorInvalidCredentials.Error(), "Expected invalid credentials error")
 	assert.Equal(t, -1, userID, "User ID should be -1 on error")
 
 	if err := mock.ExpectationsWereMet(); err != nil {

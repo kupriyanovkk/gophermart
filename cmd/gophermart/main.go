@@ -26,5 +26,6 @@ func main() {
 	}
 
 	shared.BootstrapDB(context.Background(), db)
-	app.Start()
+	app.Prepare(flags)
+	app.Start(flags)
 }

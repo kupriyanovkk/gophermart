@@ -3,22 +3,18 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
+	"github.com/kupriyanovkk/gophermart/internal/domains/user/failure"
 	"github.com/kupriyanovkk/gophermart/internal/domains/user/models"
-	"github.com/kupriyanovkk/gophermart/internal/domains/user/store"
-	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/kupriyanovkk/gophermart/internal/tokenutil"
 )
 
-var userStore *store.Store
+var userStore models.UserStore
 
-func Init(db shared.DatabaseConnection) {
-	fmt.Println("user init")
-
-	userStore = store.NewStore(db)
+func Init(store models.UserStore) {
+	userStore = store
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
@@ -31,12 +27,12 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Login == "" || req.Password == "" {
-		http.Error(w, store.ErrorInvalidRequests.Error(), http.StatusBadRequest)
+		http.Error(w, failure.ErrorInvalidRequests.Error(), http.StatusBadRequest)
 		return
 	}
 
 	userID, err := userStore.LoginUser(r.Context(), strings.TrimSpace(req.Login), strings.TrimSpace(req.Password))
-	if errors.Is(err, store.ErrorInvalidCredentials) {
+	if errors.Is(err, failure.ErrorInvalidCredentials) {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
 		return
 	}
@@ -61,12 +57,12 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Login == "" || req.Password == "" {
-		http.Error(w, store.ErrorInvalidRequests.Error(), http.StatusBadRequest)
+		http.Error(w, failure.ErrorInvalidRequests.Error(), http.StatusBadRequest)
 		return
 	}
 
 	userID, err := userStore.RegisterUser(r.Context(), strings.TrimSpace(req.Login), strings.TrimSpace(req.Password))
-	if errors.Is(err, store.ErrorLoginConflict) {
+	if errors.Is(err, failure.ErrorLoginConflict) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}

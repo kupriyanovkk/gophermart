@@ -12,12 +12,6 @@ type DatabaseConnection interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 }
 
-type LoyaltyOperation struct {
-	ID      string  `json:"order"`
-	Status  string  `json:"status"`
-	Accrual float32 `json:"accrual,omitempty"`
-}
-
 func BootstrapDB(ctx context.Context, DB DatabaseConnection) error {
 	tx, err := DB.BeginTx(ctx, nil)
 	if err != nil {

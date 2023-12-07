@@ -54,9 +54,15 @@ func GetUserID(tokenString string) int {
 	return claims.UserID
 }
 
-func SetTokenToHeader(w http.ResponseWriter, userID int) {
+func GetBearerHeader(userID int) string {
 	token, _ := BuildJWTString(userID)
 	bearer := "Bearer " + token
+
+	return bearer
+}
+
+func SetTokenToHeader(w http.ResponseWriter, userID int) {
+	bearer := GetBearerHeader(userID)
 
 	w.Header().Set("Authorization", bearer)
 }
@@ -64,11 +70,15 @@ func SetTokenToHeader(w http.ResponseWriter, userID int) {
 func GetUserIDFromHeader(r *http.Request) int {
 	authHeader := r.Header.Get("Authorization")
 
-	if authHeader == "" {
+	return GetUserIDFromAuthHeader(authHeader)
+}
+
+func GetUserIDFromAuthHeader(header string) int {
+	if header == "" {
 		return -1
 	}
 
-	splitToken := strings.Split(authHeader, "Bearer ")
+	splitToken := strings.Split(header, "Bearer ")
 	if len(splitToken) != 2 {
 		return -1
 	}

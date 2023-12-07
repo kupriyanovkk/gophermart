@@ -7,7 +7,8 @@ import (
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/kupriyanovkk/gophermart/internal/domains/order/status"
+	"github.com/kupriyanovkk/gophermart/internal/accrual"
+	"github.com/kupriyanovkk/gophermart/internal/domains/order/failure"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,7 +28,7 @@ func TestAddOrder(t *testing.T) {
 
 	err = testStore.AddOrder(context.Background(), orderID, userID)
 
-	assert.EqualError(t, err, ErrorOrderAlreadyAdded.Error(), "Expected error for order already added")
+	assert.EqualError(t, err, failure.ErrorOrderAlreadyAdded.Error(), "Expected error for order already added")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unfulfilled expectations: %s", err)
@@ -50,7 +51,7 @@ func TestAddOrder_OrderConflict(t *testing.T) {
 
 	err = testStore.AddOrder(context.Background(), orderID, userID)
 
-	assert.EqualError(t, err, ErrorOrderConflict.Error(), "Expected error for order conflict")
+	assert.EqualError(t, err, failure.ErrorOrderConflict.Error(), "Expected error for order conflict")
 
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Errorf("Unfulfilled expectations: %s", err)
@@ -71,7 +72,7 @@ func TestAddOrder_Success(t *testing.T) {
 
 	mock.ExpectQuery(`^SELECT fk_user_id FROM orders WHERE id`).WithArgs(orderID).WillReturnRows(sqlmock.NewRows([]string{"fk_user_id"}))
 
-	mock.ExpectExec(`^INSERT INTO orders`).WithArgs(orderID, status.OrderStatusNew, 0, sqlmock.AnyArg(), userID).WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectExec(`^INSERT INTO orders`).WithArgs(orderID, accrual.StatusNew, 0, sqlmock.AnyArg(), userID).WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err = testStore.AddOrder(context.Background(), orderID, userID)
 

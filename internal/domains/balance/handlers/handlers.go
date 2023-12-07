@@ -3,24 +3,17 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 
-	"github.com/kupriyanovkk/gophermart/internal/domains/balance"
+	"github.com/kupriyanovkk/gophermart/internal/domains/balance/failure"
 	"github.com/kupriyanovkk/gophermart/internal/domains/balance/models"
-	"github.com/kupriyanovkk/gophermart/internal/domains/balance/store"
-	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/kupriyanovkk/gophermart/internal/tokenutil"
 )
 
-var balanceStore *store.Store
+var balanceStore models.BalanceStore
 
-func Init(db shared.DatabaseConnection, loyaltyChan chan shared.LoyaltyOperation) {
-	fmt.Println("balance init")
-
-	balanceStore = store.NewStore(db, loyaltyChan)
-
-	go balance.Flush(balanceStore)
+func Init(store models.BalanceStore) {
+	balanceStore = store
 }
 
 func GetUserBalance(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +45,7 @@ func PostWithdraw(w http.ResponseWriter, r *http.Request) {
 	userID := tokenutil.GetUserIDFromHeader(r)
 
 	err := balanceStore.AddWithdraw(r.Context(), userID, req.Order, req.Sum)
-	if errors.Is(err, store.ErrorNoMoney) {
+	if errors.Is(err, failure.ErrorNoMoney) {
 		http.Error(w, err.Error(), http.StatusPaymentRequired)
 		return
 	}

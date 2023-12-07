@@ -3,26 +3,20 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 
-	"github.com/kupriyanovkk/gophermart/internal/domains/order"
-	"github.com/kupriyanovkk/gophermart/internal/domains/order/store"
+	"github.com/kupriyanovkk/gophermart/internal/domains/order/failure"
+	"github.com/kupriyanovkk/gophermart/internal/domains/order/models"
 	"github.com/kupriyanovkk/gophermart/internal/luhn"
-	"github.com/kupriyanovkk/gophermart/internal/shared"
 	"github.com/kupriyanovkk/gophermart/internal/tokenutil"
 )
 
-var orderStore *store.Store
+var orderStore models.OrderStore
 
-func Init(db shared.DatabaseConnection, loyaltyChan chan shared.LoyaltyOperation) {
-	fmt.Println("order init")
-
-	orderStore = store.NewStore(db)
-
-	go order.Flush(orderStore, loyaltyChan)
+func Init(store models.OrderStore) {
+	orderStore = store
 }
 
 func GetOrders(w http.ResponseWriter, r *http.Request) {
@@ -68,17 +62,20 @@ func PostOrders(w http.ResponseWriter, r *http.Request) {
 
 	userID := tokenutil.GetUserIDFromHeader(r)
 	err = orderStore.AddOrder(r.Context(), orderID, userID)
-	if errors.Is(err, store.ErrorOrderConflict) {
+	if errors.Is(err, failure.ErrorOrderConflict) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 
-	if err == nil || errors.Is(err, store.ErrorOrderAlreadyAdded) {
-		orderStore.OrdersChan <- orderID
+	if err == nil || errors.Is(err, failure.ErrorOrderAlreadyAdded) {
+		orderStore.WriteChan(models.Order{
+			UserID: userID,
+			Number: strconv.Itoa(orderID),
+		})
 	}
 
 	if err != nil {
-		if errors.Is(err, store.ErrorOrderAlreadyAdded) {
+		if errors.Is(err, failure.ErrorOrderAlreadyAdded) {
 			w.WriteHeader(http.StatusOK)
 		} else {
 			http.Error(w, err.Error(), http.StatusConflict)
